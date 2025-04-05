@@ -4,6 +4,7 @@ import { app } from './app';
 import verifyEnvVariables from './utills/checkURI';
 import connectdb from "./db/index";
 
+dotenv.config();
 dotenv.config({ path: './env' });
 
 const requiredEnvVars = ["ACCESS_TOKEN_SECRET", "REFRESH_TOKEN_SECRET", "PORT", "MONGODB_URL"];
