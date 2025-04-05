@@ -3,9 +3,10 @@ import cookieParser from 'cookie-parser';
 import cors from 'cors';
 
 const app: Express = express();
-
+// TODO :  if NODE_ENV production 
 app.use(cors({
-    origin: process.env.CORS_ORIGIN as string,
+    // origin: process.env.CORS_ORIGIN as string,
+    origin: '*',
     credentials: true
 }));
 
@@ -36,6 +37,7 @@ app.use((req, res, next) => {
     next();
 });
 
+app.get('/')
 import adminRouter from './routes/administratorRoutes/admin.route'
 import hotelAdminRouter from './routes/admin.hotel.route'
 import staffRouter from './routes/staff.route'

@@ -77,7 +77,7 @@ export interface IRoomDocument  {
 }
 
 
-const API_BASE_URL = "http://localhost:8000/api/v1/room";
+const API_BASE_URL = "http://192.168.29.146:8000/api/v1/room";
 const DEFAULT_HOTEL_ID = "60d21b4667d0d8992e610c85";
 
 

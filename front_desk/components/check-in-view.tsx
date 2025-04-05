@@ -18,7 +18,7 @@ import { Textarea } from "@/components/ui/textarea"
 import { useToast } from "./ui/use-toast"
 
 // API endpoints
-const API_BASE_URL = "http://localhost:8000/api/v1";
+const API_BASE_URL = "http://192.168.29.146:8000/api/v1";
 const ROOM_API = `${API_BASE_URL}/room`;
 const GUEST_API = `${API_BASE_URL}/guest`;
 const BOOKING_API = `${API_BASE_URL}/booking`;
