@@ -25,7 +25,7 @@ import { log } from "node:console"
 // Async function to fetch restaurant data and return menu
 const getRestaurentData = async () => {
   try {
-    const response = await fetch('http://localhost:8000/api/v1/admin/hotel/restaurant/67e8f522404a64803d0cea8d/menu')
+    const response = await fetch('https://8tvnlx2t-8000.inc1.devtunnels.ms/api/v1/admin/hotel/restaurant/67e8f522404a64803d0cea8d/menu')
     if (!response.ok) {
       throw new Error(`HTTP error! Status: ${response.status}`)
     }
@@ -44,7 +44,7 @@ const getRestaurentData = async () => {
   }
 }
 async function addMenuToRestaurant(restaurantId: string, menuData: any) {
-  const url = `http://localhost:8000/api/v1/admin/hotel/restaurant/${restaurantId}/menu`;
+  const url = `https://8tvnlx2t-8000.inc1.devtunnels.ms/api/v1/admin/hotel/restaurant/${restaurantId}/menu`;
 
   try {
     const response = await fetch(url, {
@@ -238,7 +238,7 @@ export default function NewOrder({ onCheckout }: any) {
 
     try {
       const response = await fetch(
-        `http://localhost:8000/api/v1/admin/hotel/restaurant/67e8f522404a64803d0cea8d/menu-items/${editingCategoryId}/${editingMenuItem.id}`,
+        `https://8tvnlx2t-8000.inc1.devtunnels.ms/api/v1/admin/hotel/restaurant/67e8f522404a64803d0cea8d/menu-items/${editingCategoryId}/${editingMenuItem.id}`,
         {
           method: 'DELETE',
           headers: {
@@ -272,7 +272,7 @@ export default function NewOrder({ onCheckout }: any) {
       });
       
       const response = await fetch(
-        `http://localhost:8000/api/v1/admin/hotel/restaurant/67e8f522404a64803d0cea8d/menu-items/${editingMenuItem.id}`,
+        `https://8tvnlx2t-8000.inc1.devtunnels.ms/api/v1/admin/hotel/restaurant/67e8f522404a64803d0cea8d/menu-items/${editingMenuItem.id}`,
         {
           method: 'PATCH',
           headers: {

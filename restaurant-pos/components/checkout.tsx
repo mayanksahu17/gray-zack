@@ -46,7 +46,7 @@ export default function Checkout({ order, onComplete, onBack } : any) {
   const fetchTables = async () => {
     try {
       const response = await fetch(
-        "http://localhost:8000/api/v1/admin/hotel/restaurant/67e8f522404a64803d0cea8d/tables",
+        "https://8tvnlx2t-8000.inc1.devtunnels.ms/api/v1/admin/hotel/restaurant/67e8f522404a64803d0cea8d/tables",
       )
       const data = await response.json()
       if (data.success) {
@@ -79,7 +79,7 @@ export default function Checkout({ order, onComplete, onBack } : any) {
     setIsProcessing(true)
     try {
       // 1. Process payment
-      const paymentResponse = await fetch("http://localhost:8000/api/v1/admin/hotel/restaurant/payments/process", {
+      const paymentResponse = await fetch("https://8tvnlx2t-8000.inc1.devtunnels.ms/api/v1/admin/hotel/restaurant/payments/process", {
         method: "POST",
         headers: {
           "Content-Type": "application/json",
@@ -99,7 +99,7 @@ export default function Checkout({ order, onComplete, onBack } : any) {
       }
       
       // 2. Create order with payment information
-      const orderResponse = await fetch("http://localhost:8000/api/v1/admin/hotel/restaurant/orders", {
+      const orderResponse = await fetch("https://8tvnlx2t-8000.inc1.devtunnels.ms/api/v1/admin/hotel/restaurant/orders", {
         method: "POST",
         headers: {
           "Content-Type": "application/json",

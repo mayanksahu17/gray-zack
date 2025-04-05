@@ -46,7 +46,7 @@ export default function RestaurantTables() {
   const fetchTables = async () => {
     setLoading(true)
     try {
-      const response = await fetch(`http://localhost:8000/api/v1/admin/hotel/restaurant/${restaurantId}/tables`)
+      const response = await fetch(`https://8tvnlx2t-8000.inc1.devtunnels.ms/api/v1/admin/hotel/restaurant/${restaurantId}/tables`)
       const data = await response.json()
 
       if (data.success) {
