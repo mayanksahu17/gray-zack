@@ -4,11 +4,10 @@
   "description": "",
   "main": "dist/index.js",
   "scripts": {
-    "start": "node dist/index.js",
+    "dev": "nodemon -r dotenv/config src/index.ts",
     "build": "tsc",
-    "dev": "node -r dotenv/config src/index.ts",
-    "lint": "prettier --check .",
-    "format": "prettier --write ."
+    "start": "node dist/index.js",
+    "prod": "npm run build && npm run start"
   },
   "keywords": [],
   "author": "",
