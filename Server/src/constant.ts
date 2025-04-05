@@ -1,2 +1,2 @@
- export const DB_NAME: String = "customers"
+ export const DB_NAME: String = "rooms"
  

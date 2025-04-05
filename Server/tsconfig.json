@@ -1,5 +1,6 @@
 {
     "compilerOptions": {
+      "jsx": "react-jsx",             // ✅ Enable JSX with React 17+ style
         "esModuleInterop": true,
       "target": "ES6",
       "module": "CommonJS",
@@ -8,6 +9,6 @@
     },
     "include": [
       "src/**/*.ts"
-    ]
+, "src/lib/mail-service/mail-templates/notify-staff.tsx", "src/controller/hotel.admin.controller.tsx"    ]
   }
   

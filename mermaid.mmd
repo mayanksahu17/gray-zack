@@ -1,0 +1,45 @@
+graph TD
+
+    subgraph User_Workflow
+        A1(User Login & Authentication)
+        A2(Dashboard Access: Admin, Front Desk, Restaurant Staff, Housekeeping)
+        A3(Service Selection: Room Booking, Restaurant Orders, Maintenance Requests)
+        A4(Payment Processing: ZifyPay, Split Billing, Contactless)
+        A5(Confirmation & Receipt)
+        A6(Feedback & Loyalty Points)
+    end
+
+    A1 --> A2
+    A2 --> A3
+    A3 --> A4
+    A4 --> A5
+    A5 --> A6
+
+    subgraph Admin_Workflow
+        B1(Admin Login)
+        B2(Dashboard: Revenue, Occupancy, Staff Performance)
+        B3(Reports & Analytics)
+        B4(Integration Settings: PMS, OTA, Accounting)
+        B5(Billing & Subscription Management)
+    end
+
+    B1 --> B2
+    B2 --> B3
+    B3 --> B4
+    B4 --> B5
+
+    subgraph Guest_Workflow
+        C1(Guest Login / Guest Portal)
+        C2(Online Check-in / Room Selection)
+        C3(Service Requests: Room Service, Housekeeping)
+        C4(Payment: Contactless, Mobile Wallets)
+        C5(Feedback Submission)
+    end
+
+    C1 --> C2
+    C2 --> C3
+    C3 --> C4
+    C4 --> C5
+
+    User_Workflow --> Admin_Workflow
+    User_Workflow --> Guest_Workflow
