@@ -16,25 +16,29 @@ import { Separator } from "@/components/ui/separator"
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs"
 import { Textarea } from "@/components/ui/textarea"
 import { useToast } from "./ui/use-toast"
-
+import { useRouter } from "next/navigation"
+// import { BASE_URL as API_BASE_URL } from "@/lib/constants"
 // API endpoints
-const API_BASE_URL = "https://8tvnlx2t-8000.inc1.devtunnels.ms/api/v1";
+const API_BASE_URL = "http://localhost:8000/api/v1";
 const ROOM_API = `${API_BASE_URL}/room`;
 const GUEST_API = `${API_BASE_URL}/guest`;
-const BOOKING_API = `${API_BASE_URL}/booking`;
+const BOOKING_API = `${API_BASE_URL}/reservation`;
 const ADDON_API = `${API_BASE_URL}/addon`;
 const INVOICE_API = `${API_BASE_URL}/invoice`;
 
 const DEFAULT_HOTEL_ID = "60d21b4667d0d8992e610c85";
 
+// import { toast } from 'react-toastify';
+
 // Tax rate for calculations
 const TAX_RATE = 0.12;
 
 export function CheckInView() {
+  const router = useRouter
   const { toast } = useToast();
   const [step, setStep] = useState(1);
   const [isLoading, setIsLoading] = useState(false);
-  
+  const [securityDepositPaid, setSecurityDepositPaid] = useState(false);
   // Room selection state
   const [availableRooms, setAvailableRooms] = useState([]);
   const [selectedRoom, setSelectedRoom] = useState(null);
@@ -48,7 +52,12 @@ export function CheckInView() {
     email: "",
     phone: "",
     idNumber: "",
-    address: ""
+    address: "",
+    // new
+    reservationNumber : "",
+    nationality : "",
+    idType : "passport",
+
   });
   
   // Stay details state
@@ -67,7 +76,8 @@ export function CheckInView() {
     cardNumber: "",
     expiryDate: "",
     cvv: "",
-    nameOnCard: ""
+    nameOnCard: "",
+    amount: "",
   });
   
   // Add-ons state
@@ -200,6 +210,49 @@ export function CheckInView() {
     }));
   };
 
+  
+  const handleMakePayment = async () => {
+    try {
+      setIsLoading(true);
+      const res = await fetch("http://localhost:8000/api/v1/payment/make-payment", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          cardNumber: cardInfo.cardNumber,
+          expiry: cardInfo.expiryDate,
+          cvv: cardInfo.cvv,
+          amount: parseFloat(cardInfo.amount),
+          currency: "USD",
+          userId:guestInfo.email , // Replace with dynamic user ID if available
+        }),
+      });
+  
+      const data = await res.json();
+      if (data.success) {
+        setSecurityDepositPaid(true);
+        toast({
+          title: "Payment Successful",
+          description: `Security deposit of $${cardInfo.amount} has been processed. Transaction ID: ${data.transactionId}`,
+        });
+      } else {
+        toast({
+          title: "Payment Failed",
+          description: data.message || "Unable to process payment",
+          variant: "destructive",
+        });
+      }
+    } catch (error) {
+      toast({
+        title: "Error",
+        description: "Error processing payment. Please try again.",
+        variant: "destructive",
+      });
+      console.error(error);
+    } finally {
+      setIsLoading(false);
+    }
+  };
+
   // Handle add-on selection
   const handleAddOnChange = (id, isChecked) => {
     setSelectedAddOns(prev => ({
@@ -230,38 +283,168 @@ export function CheckInView() {
     }));
   };
 
-  // Check for existing guest
+  
+  // Check for existing guest by email
   const checkExistingGuest = async () => {
-    if (!guestInfo.email) return;
+    if (!guestInfo.email) {
+      toast({
+        title: "Email Required",
+        description: "Please enter an email address to search for existing guests.",
+        variant: "destructive",
+      });
+      return;
+    }
     
+    setIsLoading(true);
     try {
       const response = await axios.get(`${GUEST_API}?email=${guestInfo.email}`);
+      
       if (response.data.data.length > 0) {
         const guest = response.data.data[0];
         setGuestInfo({
-          firstName: guest.firstName,
-          lastName: guest.lastName,
-          email: guest.email,
-          phone: guest.phone || "",
-          idNumber: guest.idNumber || "",
-          address: guest.address || ""
+          firstName: guest.personalInfo?.firstName || "",
+          lastName: guest.personalInfo?.lastName || "",
+          email: guest.email || guest.personalInfo?.email || "",
+          phone: guest.phone || guest.personalInfo?.phone || "",
+          idNumber: guest.idNumber || guest.personalInfo?.idNumber || "",
+          address: guest.address || guest.personalInfo?.address || "",
+          nationality: guest.nationality || guest.personalInfo?.nationality || "",
+          idType: guest.idType || guest.personalInfo?.idType || "passport",
+          reservationNumber: guestInfo.reservationNumber
         });
         
         toast({
           title: "Guest Found",
           description: "We found your information in our system.",
         });
+      } else {
+        toast({
+          title: "Guest Not Found",
+          description: "No guest found with this email address. Please enter guest details.",
+        });
       }
     } catch (error) {
       console.error("Error checking existing guest:", error);
+      toast({
+        title: "Error",
+        description: "Failed to check for existing guest.",
+        variant: "destructive",
+      });
+    } finally {
+      setIsLoading(false);
     }
   };
+
+  // Check for existing reservation
+  const checkReservation = async () => {
+    if (!stayDetails.reservationNumber) {
+      toast({
+        title: "Reservation Number Required",
+        description: "Please enter a reservation number to search.",
+        variant: "destructive",
+      });
+      return;
+    }
+    
+    setIsLoading(true);
+    try {
+      const response = await axios.get(`${BOOKING_API}/${stayDetails.reservationNumber}`);
+      
+      if (response.data.success) {
+        const booking = response.data.data;
+        
+        // Get guest details
+        const guestResponse = await axios.get(`${GUEST_API}/${booking.guestId}`);
+        const guest = guestResponse.data.data;
+        
+        // Get room details
+        const roomResponse = await axios.get(`${ROOM_API}/${booking.roomId}`);
+        const room = roomResponse.data.data;
+        
+        // Set all the information from the reservation
+        setGuestInfo({
+          firstName: guest.personalInfo?.firstName || "",
+          lastName: guest.personalInfo?.lastName || "",
+          email: guest.email || guest.personalInfo?.email || "",
+          phone: guest.phone || guest.personalInfo?.phone || "",
+          idNumber: guest.idNumber || guest.personalInfo?.idNumber || "",
+          address: guest.address || guest.personalInfo?.address || "",
+          nationality: guest.nationality || guest.personalInfo?.nationality || "",
+          idType: guest.idType || guest.personalInfo?.idType || "passport",
+          reservationNumber: stayDetails.reservationNumber
+        });
+        
+        setStayDetails({
+          checkInDate: new Date(booking.checkIn).toISOString().split('T')[0],
+          checkOutDate: new Date(booking.expectedCheckOut).toISOString().split('T')[0],
+          adults: booking.adults.toString(),
+          children: booking.children.toString(),
+          specialRequests: booking.specialRequests || "",
+          reservationNumber: stayDetails.reservationNumber
+        });
+        
+        setSelectedRoom(room._id);
+        setRoomDetails(room);
+        
+        // Set add-ons if any
+        if (booking.addOns && booking.addOns.length > 0) {
+          const addOnsObj = {};
+          booking.addOns.forEach(addon => {
+            const foundAddon = availableAddOns.find(a => a.name === addon.name);
+            if (foundAddon) {
+              addOnsObj[foundAddon._id] = true;
+            }
+          });
+          setSelectedAddOns(addOnsObj);
+        }
+        
+        // Calculate billing
+        const checkInDate = new Date(booking.checkIn);
+        const checkOutDate = new Date(booking.expectedCheckOut);
+        const nights = Math.ceil((checkOutDate - checkInDate) / (1000 * 60 * 60 * 24));
+        
+        const roomTotal = room.pricePerNight * nights;
+        const taxes = roomTotal * TAX_RATE;
+        
+        setBilling({
+          roomTotal,
+          taxes,
+          resortFee: 45,
+          addOnsTotal: booking.addOns?.reduce((total, addon) => total + addon.cost, 0) || 0,
+          total: booking.payment.totalAmount
+        });
+        
+        toast({
+          title: "Reservation Found",
+          description: "Reservation details loaded successfully.",
+        });
+      } else {
+        toast({
+          title: "Reservation Not Found",
+          description: "No reservation found with this number. Please check and try again.",
+          variant: "destructive",
+        });
+      }
+    } catch (error) {
+      console.error("Error checking reservation:", error);
+      toast({
+        title: "Error",
+        description: "Failed to check reservation. Please try again.",
+        variant: "destructive",
+      });
+    } finally {
+      setIsLoading(false);
+    }
+  };
+
 
   // Create new guest
   const createGuest = async () => {
     try {
-      const response = await axios.post(GUEST_API, guestInfo);
-      return response.data.data._id;
+      const response = await axios.post(GUEST_API, {  hotelId : DEFAULT_HOTEL_ID  , personalInfo : guestInfo});
+      console.log(response.data.guestId);
+      
+      return response.data?.guestId || null;
     } catch (error) {
       console.error("Error creating guest:", error);
       throw error;
@@ -269,7 +452,7 @@ export function CheckInView() {
   };
 
   // Create new booking
-  const createBooking = async (guestId) => {
+  const createBooking = async (guestId : string) => {
     try {
       // Format add-ons for booking
       const addOns = [];
@@ -280,6 +463,7 @@ export function CheckInView() {
             let cost = addon.cost;
             if (addon.perPerson && addon.perPerson === true) {
               // If per person, multiply by number of adults
+              
               cost = addon.cost * parseInt(stayDetails.adults);
             }
             addOns.push({
@@ -294,11 +478,11 @@ export function CheckInView() {
       // Format payment info
       const payment = {
         method: paymentMethod === "credit-card" ? "credit_card" : 
-                paymentMethod === "cash" ? "cash" : "corporate",
+                paymentMethod === "cash" ? "cash" : "online",
         status: "authorized",
-        securityDeposit: 200, // Default security deposit
+        securityDeposit: cardInfo.amount, // Default security deposit
         totalAmount: billing.total,
-        paidAmount: 200, // Only security deposit paid at check-in
+        paidAmount: cardInfo.amount, // Only security deposit paid at check-in
         last4Digits: cardInfo.cardNumber ? cardInfo.cardNumber.slice(-4) : null,
         transactionId: `txn_${Date.now()}`
       };
@@ -316,8 +500,9 @@ export function CheckInView() {
         payment: payment,
         status: "checked_in"
       };
+      console.log(bookingData);
       
-      const response = await axios.post(BOOKING_API, bookingData);
+      const response = await axios.post(`${BOOKING_API}/create`, bookingData);
       return response.data.data;
     } catch (error) {
       console.error("Error creating booking:", error);
@@ -326,11 +511,11 @@ export function CheckInView() {
   };
 
   // Create invoice
-  const createInvoice = async (booking) => {
+  const createInvoice = async (booking : any) => {
     try {
       // Calculate nights
-      const checkInDate = new Date(stayDetails.checkInDate);
-      const checkOutDate = new Date(stayDetails.checkOutDate);
+      const checkInDate :Date = new Date(stayDetails.checkInDate);
+      const checkOutDate : Date= new Date(stayDetails.checkOutDate);
       const nights = Math.ceil((checkOutDate - checkInDate) / (1000 * 60 * 60 * 24));
       
       // Create line items
@@ -392,7 +577,7 @@ export function CheckInView() {
         }
       };
       
-      const response = await axios.post(INVOICE_API, invoiceData);
+      const response = await axios.post(`${INVOICE_API}/create`, invoiceData);
       return response.data.data;
     } catch (error) {
       console.error("Error creating invoice:", error);
@@ -400,8 +585,43 @@ export function CheckInView() {
     }
   };
 
+
+  function showMessage(message : string, duration = 3000) {
+    const container = document.getElementById('checkindiv');
+  
+    if (!container) {
+      console.warn('Container with id "checkindiv" not found.');
+      return;
+    }
+  
+    const msgDiv = document.createElement('div');
+    msgDiv.textContent = message;
+    msgDiv.className = 'bg-green-100 text-green-900 px-4 py-2 rounded shadow transition-opacity duration-500';
+  
+    container.appendChild(msgDiv);
+  
+    // Auto-remove after duration
+    setTimeout(() => {
+      msgDiv.style.opacity = '0';
+      setTimeout(() => {
+        msgDiv.remove();
+      }, 500); // wait for fade-out transition
+    }, duration);
+  }
+  
+
   // Handle check-in submission
   const handleCheckIn = async () => {
+    // For cash or corporate payment, we can bypass the security deposit check
+    if (paymentMethod === "credit-card" && !securityDepositPaid) {
+      toast({
+        title: "Payment Required",
+        description: "Please complete the security deposit payment first.",
+        variant: "destructive",
+      });
+      return;
+    }
+  
     setIsLoading(true);
     
     try {
@@ -413,7 +633,7 @@ export function CheckInView() {
       
       // 3. Create invoice
       await createInvoice(booking);
-      
+      showMessage("Check-in Complete")
       // 4. Show success message
       toast({
         title: "Check-in Complete",
@@ -421,7 +641,8 @@ export function CheckInView() {
       });
       
       // 5. Reset form or redirect
-      // resetForm() or router.push('/dashboard')
+      // resetForm() 
+      window.location.replace('/sucessfull')
       
     } catch (error) {
       console.error("Error completing check-in:", error);
@@ -947,7 +1168,7 @@ export function CheckInView() {
     const nights = Math.ceil((checkOutDate - checkInDate) / (1000 * 60 * 60 * 24));
     
     return (
-      <div className="space-y-6">
+      <div className="space-y-6" id="checkindiv">
         <div className="flex items-center gap-2">
           <Button variant="outline" size="icon" onClick={prevStep}>
             <ArrowLeft className="h-4 w-4" />
@@ -993,78 +1214,114 @@ export function CheckInView() {
             </Card>
 
             <Card>
-              <CardHeader>
-                <CardTitle>Payment Method (Security Deposit)</CardTitle>
-              </CardHeader>
-              <CardContent>
-                <RadioGroup value={paymentMethod} onValueChange={setPaymentMethod} className="space-y-3">
-                  <div className="flex items-center space-x-2 rounded-md border p-3">
-                    <RadioGroupItem value="credit-card" id="credit-card" />
-                    <Label htmlFor="credit-card" className="flex flex-1 items-center gap-2">
-                      <CreditCard className="h-4 w-4" />
-                      <span>Credit Card</span>
-                    </Label>
-                  </div>
-                  <div className="flex items-center space-x-2 rounded-md border p-3">
-                    <RadioGroupItem value="cash" id="cash" />
-                    <Label htmlFor="cash" className="flex flex-1 items-center gap-2">
-                      <DollarSign className="h-4 w-4" />
-                      <span>Cash</span>
-                    </Label>
-                  </div>
-                  <div className="flex items-center space-x-2 rounded-md border p-3">
-                    <RadioGroupItem value="corporate" id="corporate" />
-                    <Label htmlFor="corporate" className="flex flex-1 items-center gap-2">
-                      <Wallet className="h-4 w-4" />
-                      <span>Corporate Account</span>
-                    </Label>
-                  </div>
-                </RadioGroup>
+            <CardHeader>
+              <CardTitle>Payment Method (Security Deposit)</CardTitle>
+            </CardHeader>
+            <CardContent>
+              <RadioGroup value={paymentMethod} onValueChange={setPaymentMethod} className="space-y-3">
+                <div className="flex items-center space-x-2 rounded-md border p-3">
+                  <RadioGroupItem value="credit-card" id="credit-card" />
+                  <Label htmlFor="credit-card" className="flex flex-1 items-center gap-2">
+                    <CreditCard className="h-4 w-4" />
+                    <span>Credit Card</span>
+                  </Label>
+                </div>
+                <div className="flex items-center space-x-2 rounded-md border p-3">
+                  <RadioGroupItem value="cash" id="cash" />
+                  <Label htmlFor="cash" className="flex flex-1 items-center gap-2">
+                    <DollarSign className="h-4 w-4" />
+                    <span>Cash</span>
+                  </Label>
+                </div>
+                <div className="flex items-center space-x-2 rounded-md border p-3">
+                  <RadioGroupItem value="online" id="online" />
+                  <Label htmlFor="corporate" className="flex flex-1 items-center gap-2">
+                    <Wallet className="h-4 w-4" />
+                    <span>Online payment</span>
+                  </Label>
+                </div>
+              </RadioGroup>
 
-                {paymentMethod === "credit-card" && (
-                  <div className="mt-4 space-y-3">
+              {paymentMethod === "credit-card" && (
+                <div className="mt-4 space-y-3">
+                  <div>
+                    <Label htmlFor="cardNumber">Card Number</Label>
+                    <Input
+                      id="cardNumber"
+                      placeholder="0000 0000 0000 0000"
+                      value={cardInfo.cardNumber}
+                      onChange={handleCardInfoChange}
+                    />
+                  </div>
+                  <div className="grid grid-cols-2 gap-3">
                     <div>
-                      <Label htmlFor="cardNumber">Card Number</Label>
-                      <Input 
-                        id="cardNumber" 
-                        placeholder="0000 0000 0000 0000" 
-                        value={cardInfo.cardNumber}
+                      <Label htmlFor="expiryDate">Expiry Date</Label>
+                      <Input
+                        id="expiryDate"
+                        placeholder="MM/YY"
+                        value={cardInfo.expiryDate}
                         onChange={handleCardInfoChange}
                       />
                     </div>
-                    <div className="grid grid-cols-2 gap-3">
-                      <div>
-                        <Label htmlFor="expiryDate">Expiry Date</Label>
-                        <Input 
-                          id="expiryDate" 
-                          placeholder="MM/YY" 
-                          value={cardInfo.expiryDate}
-                          onChange={handleCardInfoChange}
-                        />
-                      </div>
-                      <div>
-                        <Label htmlFor="cvv">CVV</Label>
-                        <Input 
-                          id="cvv" 
-                          placeholder="123" 
-                          value={cardInfo.cvv}
-                          onChange={handleCardInfoChange}
-                        />
-                      </div>
-                    </div>
                     <div>
-                      <Label htmlFor="nameOnCard">Name on Card</Label>
-                      <Input 
-                        id="nameOnCard" 
-                        placeholder="Enter name as shown on card" 
-                        value={cardInfo.nameOnCard}
+                      <Label htmlFor="cvv">CVV</Label>
+                      <Input
+                        id="cvv"
+                        placeholder="123"
+                        value={cardInfo.cvv}
                         onChange={handleCardInfoChange}
                       />
                     </div>
                   </div>
-                )}
-              </CardContent>
-            </Card>
+                  <div>
+                    <Label htmlFor="nameOnCard">Name on Card</Label>
+                    <Input
+                      id="nameOnCard"
+                      placeholder="Enter name as shown on card"
+                      value={cardInfo.nameOnCard}
+                      onChange={handleCardInfoChange}
+                    />
+                  </div>
+                  <div>
+                    <Label htmlFor="amount">Security Deposit Amount (USD)</Label>
+                    <Input
+                      id="amount"
+                      type="number"
+                      placeholder="Enter amount"
+                      value={cardInfo.amount}
+                      onChange={handleCardInfoChange}
+                    />
+                  </div>
+                  {/* Replace the existing payment button in the credit card section */}
+                    <Button 
+                      className="mt-4 w-full" 
+                      onClick={handleMakePayment}
+                      disabled={!cardInfo.cardNumber || !cardInfo.expiryDate || !cardInfo.cvv || !cardInfo.nameOnCard || !cardInfo.amount}
+                    >
+                      {securityDepositPaid ? "Payment Complete ✓" : "Process Security Deposit"}
+                    </Button>
+                </div>
+              )}
+
+              {(paymentMethod === "cash" || paymentMethod === "online") && (
+                   <div className="mt-4 space-y-3">
+                   
+                   <div>
+                     <Label htmlFor="amount">Security Deposit Amount (USD)</Label>
+                     <Input
+                       id="amount"
+                       type="number"
+                       placeholder="Enter amount"
+                       value={cardInfo.amount}
+                       onChange={handleCardInfoChange}
+                     />
+                   </div>
+                  
+                 </div>
+              )}
+
+            </CardContent>
+          </Card>
           </div>
 
           <div className="space-y-4">
@@ -1161,11 +1418,14 @@ export function CheckInView() {
             Back
           </Button>
           <Button 
-            onClick={handleCheckIn} 
-            disabled={isLoading || (paymentMethod === "credit-card" && (!cardInfo.cardNumber || !cardInfo.expiryDate || !cardInfo.cvv || !cardInfo.nameOnCard))}
-          >
-            {isLoading ? "Processing..." : "Complete Check-in"}
-          </Button>
+                onClick={handleCheckIn} 
+                disabled={
+                  isLoading || 
+                  (paymentMethod === "credit-card" && !securityDepositPaid)
+                }
+              >
+                {isLoading ? "Processing..." : "Complete Check-in"}
+              </Button>
         </div>
       </div>
     )

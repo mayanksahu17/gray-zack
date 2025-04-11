@@ -1,7 +1,8 @@
 import { Request, Response } from 'express';
 import mongoose from 'mongoose';
-import { Restaurant, MenuItem,  } from '../models/restaurant.model';
+import { Restaurant, MenuItem, Order, PaymentStatus, PaymentMethod, OrderStatus, OrderType } from '../models/restaurant.model';
 import { v4 as uuidv4 } from 'uuid';
+// import { Order } from '../models/order.model';
 // ==========================================
 // Restaurant Information Controllers
 // ==========================================
@@ -546,7 +547,6 @@ export const addRestaurantTable = async (req: Request, res: Response) => {
     }
 
     const restaurant = await Restaurant.findById(id);
-
     if (!restaurant) {
       return res.status(404).json({ success: false, message: 'Restaurant not found' });
     }
@@ -554,26 +554,33 @@ export const addRestaurantTable = async (req: Request, res: Response) => {
     // Check if table number already exists
     const existingTable = restaurant.tables.find(t => t.tableNumber === tableData.tableNumber);
     if (existingTable) {
-      return res.status(400).json({
-        success: false,
-        message: `Table with number ${tableData.tableNumber} already exists`
+      return res.status(400).json({ 
+        success: false, 
+        message: `Table with number ${tableData.tableNumber} already exists` 
       });
     }
 
-    restaurant.tables.push(tableData);
+    // Add new table
+    restaurant.tables.push({
+      ...tableData,
+      status: 'available',
+      currentOrder: undefined
+    });
+
     await restaurant.save();
 
     return res.status(201).json({
       success: true,
-      data: tableData,
+      data: restaurant.tables[restaurant.tables.length - 1],
       message: 'Table added successfully'
     });
-  } catch (error : any) {
+  } catch (error: any) {
     console.error('Error adding table:', error);
-    if (error.name === 'ValidationError') {
-      return res.status(400).json({ success: false, message: error.message });
-    }
-    return res.status(500).json({ success: false, message: 'Server error', error: error.message });
+    return res.status(500).json({ 
+      success: false, 
+      message: 'Server error', 
+      error: error.message 
+    });
   }
 };
 
@@ -582,41 +589,31 @@ export const addRestaurantTable = async (req: Request, res: Response) => {
  */
 export const updateRestaurantTable = async (req: Request, res: Response) => {
   try {
-    const { restaurantId, tableNumber } = req.params;
+    const { id, tableId } = req.params;
     const updateData = req.body;
 
-    if (!mongoose.Types.ObjectId.isValid(restaurantId)) {
+    if (!mongoose.Types.ObjectId.isValid(id)) {
       return res.status(400).json({ success: false, message: 'Invalid restaurant ID format' });
     }
 
-    const restaurant = await Restaurant.findById(restaurantId);
-
+    const restaurant = await Restaurant.findById(id);
     if (!restaurant) {
       return res.status(404).json({ success: false, message: 'Restaurant not found' });
     }
 
-    const tableIndex = restaurant.tables.findIndex(t => t.tableNumber === tableNumber);
+    const tableIndex = restaurant.tables.findIndex(t => t.tableNumber === tableId);
     if (tableIndex === -1) {
-      return res.status(404).json({
-        success: false,
-        message: `Table with number ${tableNumber} not found`
+      return res.status(404).json({ 
+        success: false, 
+        message: `Table with number ${tableId} not found` 
       });
     }
 
-    // If tableNumber is being updated, ensure it doesn't conflict with existing tables
-    if (updateData.tableNumber && updateData.tableNumber !== tableNumber) {
-      const existingTable = restaurant.tables.find(t => t.tableNumber === updateData.tableNumber);
-      if (existingTable) {
-        return res.status(400).json({
-          success: false,
-          message: `Table with number ${updateData.tableNumber} already exists`
-        });
-      }
-    }
-
+    // Update table data
     restaurant.tables[tableIndex] = {
       ...restaurant.tables[tableIndex],
-      ...updateData
+      ...updateData,
+      tableNumber: tableId // Ensure table number remains unchanged
     };
 
     await restaurant.save();
@@ -626,48 +623,49 @@ export const updateRestaurantTable = async (req: Request, res: Response) => {
       data: restaurant.tables[tableIndex],
       message: 'Table updated successfully'
     });
-  } catch (error : any) {
+  } catch (error: any) {
     console.error('Error updating table:', error);
-    if (error.name === 'ValidationError') {
-      return res.status(400).json({ success: false, message: error.message });
-    }
-    return res.status(500).json({ success: false, message: 'Server error', error: error.message });
+    return res.status(500).json({ 
+      success: false, 
+      message: 'Server error', 
+      error: error.message 
+    });
   }
 };
 
 /**
- * Delete a table
+ * Delete a table from the restaurant
  */
 export const deleteRestaurantTable = async (req: Request, res: Response) => {
   try {
-    const { restaurantId, tableNumber } = req.params;
+    const { id, tableId } = req.params;
 
-    if (!mongoose.Types.ObjectId.isValid(restaurantId)) {
+    if (!mongoose.Types.ObjectId.isValid(id)) {
       return res.status(400).json({ success: false, message: 'Invalid restaurant ID format' });
     }
 
-    const restaurant = await Restaurant.findById(restaurantId);
-
+    const restaurant = await Restaurant.findById(id);
     if (!restaurant) {
       return res.status(404).json({ success: false, message: 'Restaurant not found' });
     }
 
-    const tableIndex = restaurant.tables.findIndex(t => t.tableNumber === tableNumber);
+    const tableIndex = restaurant.tables.findIndex(t => t.tableNumber === tableId);
     if (tableIndex === -1) {
-      return res.status(404).json({
-        success: false,
-        message: `Table with number ${tableNumber} not found`
+      return res.status(404).json({ 
+        success: false, 
+        message: `Table with number ${tableId} not found` 
       });
     }
 
-    // Check if table is in use
+    // Check if table is occupied
     if (restaurant.tables[tableIndex].status === 'occupied') {
-      return res.status(400).json({
-        success: false,
-        message: `Cannot delete table ${tableNumber} because it is currently occupied`
+      return res.status(400).json({ 
+        success: false, 
+        message: 'Cannot delete an occupied table' 
       });
     }
 
+    // Remove table
     restaurant.tables.splice(tableIndex, 1);
     await restaurant.save();
 
@@ -675,98 +673,66 @@ export const deleteRestaurantTable = async (req: Request, res: Response) => {
       success: true,
       message: 'Table deleted successfully'
     });
-  } catch (error : any) {
+  } catch (error: any) {
     console.error('Error deleting table:', error);
-    return res.status(500).json({ success: false, message: 'Server error', error: error.message });
+    return res.status(500).json({ 
+      success: false, 
+      message: 'Server error', 
+      error: error.message 
+    });
   }
 };
 
 /**
- * Get available tables
-//  */
-// export const getAvailableTables = async (req: Request, res: Response) => {
-//   try {
-//     const { id } = req.params;
-
-//     if (!mongoose.Types.ObjectId.isValid(id)) {
-//       return res.status(400).json({ success: false, message: 'Invalid restaurant ID format' });
-//     }
-
-//     const restaurant = await Restaurant.findById(id);
-
-//     if (!restaurant) {
-//       return res.status(404).json({ success: false, message: 'Restaurant not found' });
-//     }
-
-//     const availableTables = restaurant.getAvailableTables();
-
-//     return res.status(200).json({
-//       success: true,
-//       data: availableTables
-//     });
-//   } catch (error : any) {
-//     console.error('Error fetching available tables:', error);
-//     return res.status(500).json({ success: false, message: 'Server error', error: error.message });
-//   }
-// };
-
-/**
- * Update table status (available, occupied, reserved, maintenance)
+ * Update a table's status
  */
 export const updateTableStatus = async (req: Request, res: Response) => {
   try {
-    const { restaurantId, tableNumber } = req.params;
+    const { id, tableNumber } = req.params;
     const { status, orderId } = req.body;
 
-    if (!mongoose.Types.ObjectId.isValid(restaurantId)) {
+    if (!mongoose.Types.ObjectId.isValid(id)) {
       return res.status(400).json({ success: false, message: 'Invalid restaurant ID format' });
     }
 
-    if (orderId && !mongoose.Types.ObjectId.isValid(orderId)) {
-      return res.status(400).json({ success: false, message: 'Invalid order ID format' });
-    }
-
-    const validStatuses = ['available', 'occupied', 'reserved', 'maintenance'];
-    if (!validStatuses.includes(status)) {
-      return res.status(400).json({ 
-        success: false, 
-        message: `Invalid status. Must be one of: ${validStatuses.join(', ')}` 
-      });
-    }
-
-    const restaurant = await Restaurant.findById(restaurantId);
-
+    const restaurant = await Restaurant.findById(id);
     if (!restaurant) {
       return res.status(404).json({ success: false, message: 'Restaurant not found' });
     }
 
-    const tableIndex = restaurant.tables.findIndex(t => t.tableNumber === tableNumber);
+    const tableIndex = restaurant.tables.findIndex(t => t.tableNumber);
     if (tableIndex === -1) {
-      return res.status(404).json({
-        success: false,
-        message: `Table with number ${tableNumber} not found`
+      return res.status(404).json({ 
+        success: false, 
+        // message: `Table with number ${tableId} not found` 
       });
     }
 
+    // Update table status
     restaurant.tables[tableIndex].status = status;
-    
-    // Update current order if provided
-    if (status === 'occupied' && orderId) {
-      restaurant.tables[tableIndex].currentOrder = orderId;
-    } else if (status === 'available') {
-      restaurant.tables[tableIndex].currentOrder = undefined;
+
+    // Only update orderId if it's provided
+    if (orderId) {
+      if (!mongoose.Types.ObjectId.isValid(orderId)) {
+        return res.status(400).json({ success: false, message: 'Invalid order ID format' });
+      }
+      restaurant.tables[tableIndex].currentOrder = new mongoose.Types.ObjectId(orderId);
     }
 
     await restaurant.save();
 
     return res.status(200).json({
       success: true,
-      data: restaurant.tables[tableIndex],
-      message: `Table status updated to ${status}`
+      message: 'Table status updated successfully',
+      data: restaurant.tables[tableIndex]
     });
-  } catch (error : any) {
+  } catch (error: any) {
     console.error('Error updating table status:', error);
-    return res.status(500).json({ success: false, message: 'Server error', error: error.message });
+    return res.status(500).json({ 
+      success: false, 
+      message: 'Server error', 
+      error: error.message 
+    });
   }
 };
 
@@ -1084,24 +1050,30 @@ try {
  * @route GET /api/v1/payments/:paymentId
  * @access Private
  */
-const getPaymentDetails =  async (req: Request, res: Response) => {
+export const getPaymentDetails = async (req: Request, res: Response) => {
   try {
     const { paymentId } = req.params;
     
-    // In a real application, you would fetch the payment from your database
-    // For this dummy implementation, we'll return a not found error
+    // Find order with matching payment ID
+    const order = await Order.findOne({ 'payment.transactionId': paymentId });
     
-    return res.status(404).json({
-      success: false,
-      message: 'Payment not found',
+    if (!order) {
+      return res.status(404).json({
+        success: false,
+        message: 'Payment not found',
+      });
+    }
+    
+    return res.status(200).json({
+      success: true,
+      data: {
+        payment: order.payment,
+        orderId: order._id,
+        orderNumber: order.orderNumber,
+        status: order.status
+      }
     });
-    
-    // If found, you would return the payment details
-    // return res.status(200).json({
-    //   success: true,
-    //   data: payment,
-    // });
-  } catch (error : any) {
+  } catch (error: any) {
     console.error('Error fetching payment:', error);
     return res.status(500).json({
       success: false,
@@ -1120,140 +1092,95 @@ const getPaymentDetails =  async (req: Request, res: Response) => {
  * @route POST /api/v1/orders
  * @access Public
  */
-export const createOrder = async  (req: Request, res: Response) => {
+export const createOrder = async (req: Request, res: Response) => {
   try {
-    const { 
-      items,
-      subtotal,
-      tax,
-      discount,
-      total,
-      diningOption,
-      tableNumber,
-      paymentMethod,
-      customerDetails,
-      orderNumber,
-      timestamp,
-      paymentId,
-      paymentStatus,
-      transactionId
-    } = req.body;
+    const { customer, items, tableNumber, type, specialInstructions, paymentMethod } = req.body;
+    const { restaurantId } = req.params;
 
     // Validate required fields
-    if (!items || !Array.isArray(items) || items.length === 0) {
-      return res.status(400).json({
-        success: false,
-        message: 'Order must contain at least one item',
+    if (!restaurantId || !customer || !items || !type) {
+      return res.status(400).json({ 
+        success: false, 
+        message: 'Missing required fields' 
       });
     }
 
-    if (!subtotal || !total || !diningOption || !paymentMethod) {
-      return res.status(400).json({
-        success: false,
-        message: 'Missing required order details',
-      });
-    }
-
-    // Validate dining option
-    if (diningOption === 'dine-in' && !tableNumber) {
-      return res.status(400).json({
-        success: false,
-        message: 'Table number is required for dine-in orders',
-      });
-    }
-
-    // Validate customer details for delivery
-    if (diningOption === 'delivery') {
-      if (!customerDetails || !customerDetails.name || !customerDetails.phone || !customerDetails.address) {
-        return res.status(400).json({
-          success: false,
-          message: 'Customer details are required for delivery orders',
-        });
-      }
-    }
-
-    // Validate payment information
-    if (!paymentId || !paymentStatus || !transactionId) {
-      return res.status(400).json({
-        success: false,
-        message: 'Payment information is required',
-      });
-    }
-
-    // Generate a unique order ID
-    const orderId = `ORDER-${Date.now()}`;
-    
-    // In a real application, you would create an order in your database
-    // For this implementation, we'll simulate order creation
-    
-    // Create order record (pseudocode)
-    // const order = await Order.create({
-    //   orderId,
-    //   items,
-    //   subtotal,
-    //   tax,
-    //   discount,
-    //   total,
-    //   diningOption,
-    //   tableNumber,
-    //   paymentMethod,
-    //   customerDetails, 
-    //   orderNumber,
-    //   paymentId,
-    //   paymentStatus,
-    //   transactionId,
-    //   status: 'received',
-    //   createdAt: new Date(),
-    // });
-
-    // If dine-in, update table status (pseudocode)
-    // if (diningOption === 'dine-in') {
-    //   await Table.findOneAndUpdate(
-    //     { tableNumber },
-    //     { status: 'occupied', currentOrderId: orderId }
-    //   );
-    // }
-
-    // Simulate API call delay
-    await new Promise(resolve => setTimeout(resolve, 800));
-
-    // Return success response with order details
-    return res.status(201).json({
-      success: true,
-      message: 'Order created successfully',
-      data: {
-        orderId,
-        orderNumber,
-        status: 'received',
-        timestamp: new Date().toISOString(),
-        estimatedReadyTime: new Date(Date.now() + 20 * 60000).toISOString(), // 20 minutes from now
+    // Calculate order totals
+    const subtotal = items.reduce((sum: number, item: any) => sum + (item.price * item.quantity), 0);
+    const tax = subtotal * 0.1; // 10% tax
+    const total = subtotal + tax;
+    // Create order with initial payment status
+    const order = new Order({
+      restaurantId,
+      orderNumber: `ORD-${Date.now()}`,
+      customer,
+      items,
+      tableNumber,
+      status: OrderStatus.PENDING,
+      type: OrderType.DINE_IN,
+      subtotal,
+      tax,
+      total,
+      payment: {
+        method: paymentMethod.toLowerCase() || PaymentMethod.CASH,
+        status: PaymentStatus.PENDING,
+        amount: total,
+        tax,
+        tip: 0
       },
+      specialInstructions,
+      orderDate: new Date(),
+      estimatedReadyTime: new Date(Date.now() + 30 * 60000) // 30 minutes from now
     });
-  } catch (error :any ) {
-    console.error('Order creation error:', error);
-    return res.status(500).json({
-      success: false,
-      message: 'An error occurred while creating the order',
-      error: process.env.NODE_ENV === 'development' ? error.message : undefined,
+
+    await order.save();
+
+    // Update restaurant's active orders
+    const restaurant = await Restaurant.findById(restaurantId);
+    if (restaurant) {
+      restaurant.activeOrders?.push(order._id);
+      await restaurant.save();
+    }
+
+    return res.status(201).json({ 
+      success: true, 
+      data: order 
+    });
+  } catch (error: any) {
+    console.error('Error creating order:', error);
+    return res.status(500).json({ 
+      success: false, 
+      message: 'Server error', 
+      error: error.message 
     });
   }
 };
 
 /**
- * Get all orders
+ * Get all orders for a restaurant
  * @route GET /api/v1/orders
  * @access Private
  */
-export const getOrders = async  (req: Request, res: Response) => {
+export const getOrders = async (req: Request, res: Response) => {
   try {
-    // In a real application, you would fetch orders from your database
-    // For this implementation, we'll return an empty array
-    
+    const { restaurantId } = req.query;
+
+    if (!restaurantId) {
+      return res.status(400).json({
+        success: false,
+        message: 'Restaurant ID is required',
+      });
+    }
+
+    const orders = await Order.find({ restaurantId })
+      .sort({ orderDate: -1 })
+      .populate('restaurantId', 'name');
+
     return res.status(200).json({
       success: true,
-      data: [],
+      data: orders
     });
-  } catch (error : any) {
+  } catch (error: any) {
     console.error('Error fetching orders:', error);
     return res.status(500).json({
       success: false,
@@ -1268,23 +1195,36 @@ export const getOrders = async  (req: Request, res: Response) => {
  * @route GET /api/v1/orders/:orderId
  * @access Private
  */
-export const getOrderById = async  (req: Request, res: Response) => {
+export const getOrderById = async (req: Request, res: Response) => {
   try {
     const { orderId } = req.params;
     
-    // In a real application, you would fetch the order from your database
-    // For this implementation, we'll return a not found error
-    
-    return res.status(404).json({
-      success: false,
-      message: 'Order not found',
+    // Validate if the ID is a valid MongoDB ObjectId
+    if (!mongoose.Types.ObjectId.isValid(orderId)) {
+      return res.status(400).json({
+        success: false,
+        message: 'Invalid order ID format'
+      });
+    }
+
+    const order = await Order.findById(orderId);
+    if (!order) {
+      return res.status(404).json({ 
+        success: false, 
+        message: 'Order not found' 
+      });
+    }
+
+    return res.status(200).json({ 
+      success: true, 
+      data: order 
     });
   } catch (error: any) {
     console.error('Error fetching order:', error);
-    return res.status(500).json({
-      success: false,
-      message: 'An error occurred while fetching the order',
-      error: process.env.NODE_ENV === 'development' ? error.message : undefined,
+    return res.status(500).json({ 
+      success: false, 
+      message: 'Server error', 
+      error: error.message 
     });
   }
 };
@@ -1294,40 +1234,145 @@ export const getOrderById = async  (req: Request, res: Response) => {
  * @route PATCH /api/v1/orders/:orderId/status
  * @access Private
  */
-export const updateOrderStatus = async  (req: Request, res: Response) => {
+export const updateOrderStatus = async (req: Request, res: Response) => {
   try {
     const { orderId } = req.params;
-    const { status } = req.body;
-    
+    const { status, paymentDetails } = req.body;
+
     if (!status) {
       return res.status(400).json({
         success: false,
         message: 'Status is required',
       });
     }
-    
+
     // Validate status
-    const validStatuses = ['received', 'preparing', 'ready', 'completed', 'cancelled'];
+    const validStatuses = ['pending', 'preparing', 'ready', 'completed', 'cancelled'];
     if (!validStatuses.includes(status)) {
       return res.status(400).json({
         success: false,
         message: 'Invalid order status',
       });
     }
-    
-    // In a real application, you would update the order in your database
-    // For this implementation, we'll return a not found error
-    
-    return res.status(404).json({
-      success: false,
-      message: 'Order not found',
+
+    const order = await Order.findById(orderId);
+    if (!order) {
+      return res.status(404).json({
+        success: false,
+        message: 'Order not found',
+      });
+    }
+
+    // If payment details are provided, update payment information
+    if (paymentDetails) {
+      order.payment = {
+        ...order.payment,
+        ...paymentDetails,
+        paymentDate: new Date()
+      };
+    }
+
+    // Update order status
+    order.status = status;
+    if (status === OrderStatus.COMPLETED) {
+      order.completedTime = new Date();
+      // Update payment status to completed if not already set
+      if (order.payment.status === PaymentStatus.PENDING) {
+        order.payment.status = PaymentStatus.PAID;
+      }
+    }
+    await order.save();
+
+    // If order is completed or cancelled and it was a dine-in order, update table status
+    if ((status === OrderStatus.COMPLETED || status === OrderStatus.CANCELLED) && order.type === OrderType.DINE_IN && order.tableNumber) {
+      const restaurant = await Restaurant.findById(order.restaurantId);
+      if (restaurant) {
+        const tableIndex = restaurant.tables.findIndex(t => t.tableNumber === order.tableNumber);
+        if (tableIndex !== -1) {
+          restaurant.tables[tableIndex].status = 'available';
+          restaurant.tables[tableIndex].currentOrder = undefined;
+          await restaurant.save();
+        }
+      }
+    }
+
+    return res.status(200).json({
+      success: true,
+      message: 'Order status updated successfully',
+      data: order
     });
-  } catch (error : any) {
+  } catch (error: any) {
     console.error('Error updating order status:', error);
     return res.status(500).json({
       success: false,
       message: 'An error occurred while updating order status',
       error: process.env.NODE_ENV === 'development' ? error.message : undefined,
+    });
+  }
+};
+
+/**
+ * Delete an order
+ * @route DELETE /api/v1/orders/:orderId
+ * @access Private
+ */
+export const deleteOrder = async (req: Request, res: Response) => {
+  try {
+    const { orderId } = req.params;
+
+    const order = await Order.findByIdAndDelete(orderId);
+    if (!order) {
+      return res.status(404).json({ 
+        success: false, 
+        message: 'Order not found' 
+      });
+    }
+
+    // Remove order from restaurant's active orders
+    const restaurant = await Restaurant.findById(order.restaurantId);
+    if (restaurant) {
+      restaurant.activeOrders = restaurant.activeOrders?.filter(
+        (id: any) => !id.equals(order._id)
+      );
+      await restaurant.save();
+    }
+
+    return res.status(200).json({ 
+      success: true, 
+      message: 'Order deleted successfully' 
+    });
+  } catch (error: any) {
+    console.error('Error deleting order:', error);
+    return res.status(500).json({ 
+      success: false, 
+      message: 'Server error', 
+      error: error.message 
+    });
+  }
+};
+
+export const getRestaurantOrders = async (req: Request, res: Response) => {
+  try {
+    const { restaurantId } = req.params;
+    const { status, type } = req.query;
+
+    let query: any = { restaurantId };
+    if (status) query.status = status;
+    if (type) query.type = type;
+
+    const orders = await Order.find(query)
+      .sort({ orderDate: -1 });
+
+    return res.status(200).json({ 
+      success: true, 
+      data: orders 
+    });
+  } catch (error: any) {
+    console.error('Error fetching orders:', error);
+    return res.status(500).json({ 
+      success: false, 
+      message: 'Server error', 
+      error: error.message 
     });
   }
 };

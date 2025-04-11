@@ -28,6 +28,7 @@ export function CheckOutView() {
 
   const handleCheckout = () => {
     setCheckoutComplete(true)
+    // window.location.replace("/scheck")
   }
 
   const renderSearchForm = () => {

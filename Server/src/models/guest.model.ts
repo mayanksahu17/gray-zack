@@ -13,7 +13,7 @@ interface PersonalInfo {
   lastName: string
   email: string
   phone: string
-  address: Address
+  address: string
   idType: 'passport' | 'driver_license' | 'national_id'
   idNumber: string
   nationality?: string
@@ -62,7 +62,7 @@ const personalInfoSchema = new Schema<PersonalInfo>(
         message: (props: any) => `${props.value} is not a valid phone number!`
       }
     },
-    address: { type: addressSchema, required: true },
+    address: { type: String, required: true },
     idType: {
       type: String,
       required: true,
@@ -87,9 +87,6 @@ const guestSchema = new Schema<IGuestDocument>(
       required: true
     },
     preferences: [{ type: String, trim: true }],
-    isCorporateGuest: { type: Boolean, default: false },
-    companyName: { type: String, trim: true },
-    notes: { type: String, trim: true }
   },
   {
     timestamps: true,

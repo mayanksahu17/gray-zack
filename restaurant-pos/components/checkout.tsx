@@ -20,6 +20,7 @@ import {
 } from "@/components/ui/dialog"
 import { Badge } from "@/components/ui/badge"
 import { useToast } from "@/components/ui/use-toast"
+// import { BASE_URL as API_BASE_URL } from "@/lib/constants"
 
 export default function Checkout({ order, onComplete, onBack } : any) {
   const [diningOption, setDiningOption] = useState("dine-in")
@@ -27,11 +28,11 @@ export default function Checkout({ order, onComplete, onBack } : any) {
   const [paymentMethod, setPaymentMethod] = useState("cash")
   const [isTableDialogOpen, setIsTableDialogOpen] = useState(false)
   const [tables, setTables] = useState([])
-  const [customerDetails, setCustomerDetails] = useState({
+  const [customerInfo, setCustomerInfo] = useState({
     name: "",
     phone: "",
     email: "",
-    address: "",
+    address: ""
   })
   const [cardDetails, setCardDetails] = useState({
     cardNumber: "",
@@ -43,10 +44,11 @@ export default function Checkout({ order, onComplete, onBack } : any) {
   const { toast } = useToast()
 
   // Function to fetch tables data
+
   const fetchTables = async () => {
     try {
       const response = await fetch(
-        "https://8tvnlx2t-8000.inc1.devtunnels.ms/api/v1/admin/hotel/restaurant/67e8f522404a64803d0cea8d/tables",
+        "http://localhost:8000/api/v1/admin/hotel/restaurant/67e8f522404a64803d0cea8d/tables",
       )
       const data = await response.json()
       if (data.success) {
@@ -75,117 +77,126 @@ export default function Checkout({ order, onComplete, onBack } : any) {
   }
   
   // Process payment and create order
-  const processPayment = async (orderDetails : any) => {
-    setIsProcessing(true)
+  const processPayment = async (orderDetails: any) => {
+    setIsProcessing(true);
     try {
       // 1. Process payment
-      const paymentResponse = await fetch("https://8tvnlx2t-8000.inc1.devtunnels.ms/api/v1/admin/hotel/restaurant/payments/process", {
+      const paymentResponse = await fetch("http://localhost:8000/api/restaurants/payments/process", {
         method: "POST",
         headers: {
           "Content-Type": "application/json",
+          "Authorization": `Bearer ${localStorage.getItem('token')}`
         },
         body: JSON.stringify({
+          orderId: orderDetails.orderId,
           amount: orderDetails.total,
           currency: "USD",
           paymentMethod: orderDetails.paymentMethod,
           cardDetails: paymentMethod === "card" ? cardDetails : null,
         }),
-      })
+      });
       
-      const paymentData = await paymentResponse.json()
+      const paymentData = await paymentResponse.json();
       
       if (!paymentData.success) {
-        throw new Error(paymentData.message || "Payment processing failed")
+        throw new Error(paymentData.message || "Payment processing failed");
       }
       
       // 2. Create order with payment information
-      const orderResponse = await fetch("https://8tvnlx2t-8000.inc1.devtunnels.ms/api/v1/admin/hotel/restaurant/orders", {
+      const orderResponse = await fetch(`http://localhost:8000/api/restaurants/67e8f522404a64803d0cea8d/orders`, {
         method: "POST",
         headers: {
           "Content-Type": "application/json",
+          "Authorization": `Bearer ${localStorage.getItem('token')}`
         },
         body: JSON.stringify({
-          ...orderDetails,
-          paymentId: paymentData.data.paymentId,
-          paymentStatus: paymentData.data.status,
-          transactionId: paymentData.data.transactionId,
+          customer: {
+            name: customerInfo.name,
+            phone: customerInfo.phone,
+            email: customerInfo.email,
+            address: customerInfo.address
+          },
+          items: orderDetails.items.map((item: any) => ({
+            itemId: item.id,
+            name: item.name,
+            price: item.price,
+            quantity: item.quantity,
+            notes: item.notes,
+            modifiers: item.modifiers,
+            subtotal: item.price * item.quantity
+          })),
+          tableNumber: diningOption === "dine-in" ? tableNumber : undefined,
+          type: diningOption.toUpperCase(),
+          paymentMethod: paymentMethod.toUpperCase(),
+          specialInstructions: orderDetails.specialInstructions,
+          payment: {
+            method: paymentMethod.toLowerCase(),
+            status: "PAID",
+            amount: orderDetails.total,
+            tax: orderDetails.tax,
+            tip: orderDetails.tip || 0,
+            transactionId: paymentData.data.transactionId
+          }
         }),
-      })
+      });
       
-      const orderData = await orderResponse.json()
+      const orderData = await orderResponse.json();
       
       if (!orderData.success) {
-        throw new Error(orderData.message || "Order creation failed")
+        throw new Error(orderData.message || "Order creation failed");
       }
       
-      setIsPaymentSuccessful(true)
+      setIsPaymentSuccessful(true);
       
       // Short delay to show success state before completing
       setTimeout(() => {
         onComplete({
           ...orderDetails,
-          orderId: orderData.data.orderId,
+          orderId: orderData.data._id,
+          orderNumber: orderData.data.orderNumber,
           paymentId: paymentData.data.paymentId,
           paymentStatus: paymentData.data.status,
           transactionId: paymentData.data.transactionId,
-        })
-      }, 1500)
+        });
+      }, 1500);
       
     } catch (error) {
-      console.error("Error processing payment:", error)
+      console.error("Error processing payment:", error);
       toast({
         title: "Payment Failed",
-        description: error.message || "There was an error processing your payment. Please try again.",
+        description: error instanceof Error ? error.message : "There was an error processing your payment. Please try again.",
         variant: "destructive",
-      })
-      setIsProcessing(false)
+      });
+      setIsProcessing(false);
     }
-  }
+  };
 
   // Handle form submission
   const handleSubmit = async (e) => {
-    e.preventDefault()
+    e.preventDefault();
     
-    // Validate form based on dining option
-    if (diningOption === "dine-in" && !tableNumber) {
-      toast({
-        title: "Table Required",
-        description: "Please select a table for dine-in option.",
-        variant: "destructive",
-      })
-      return
-    }
-    
-    if (diningOption === "delivery" && (!customerDetails.name || !customerDetails.phone || !customerDetails.address)) {
+    // Validate customer info
+    if (!customerInfo.name || !customerInfo.phone) {
       toast({
         title: "Missing Information",
-        description: "Please fill in all required delivery details.",
+        description: "Please fill in at least name and phone number",
         variant: "destructive",
-      })
-      return
-    }
-    
-    if (paymentMethod === "card" && (!cardDetails.cardNumber || !cardDetails.expiryDate || !cardDetails.cvv)) {
-      toast({
-        title: "Card Details Required",
-        description: "Please fill in all card details for card payment.",
-        variant: "destructive",
-      })
-      return
+      });
+      return;
     }
 
     const orderDetails = {
       ...order,
+      customer: customerInfo,
       diningOption,
       tableNumber: diningOption === "dine-in" ? tableNumber : null,
       paymentMethod,
-      customerDetails: diningOption === "delivery" ? customerDetails : null,
       orderNumber: Math.floor(1000 + Math.random() * 9000), // Generate random order number
       timestamp: new Date().toISOString(),
-    }
+    };
 
-    await processPayment(orderDetails)
-  }
+    await processPayment(orderDetails);
+  };
 
   // Handle card detail changes
   const handleCardDetailChange = (field, value) => {
@@ -267,6 +278,51 @@ export default function Checkout({ order, onComplete, onBack } : any) {
                 <CardDescription>Complete your order</CardDescription>
               </CardHeader>
               <CardContent className="space-y-6">
+                <div className="space-y-4">
+                  <h3 className="text-lg font-medium">Customer Information</h3>
+                  <div className="grid grid-cols-2 gap-4">
+                    <div className="space-y-2">
+                      <Label htmlFor="customer-name">Name *</Label>
+                      <Input
+                        id="customer-name"
+                        placeholder="Enter customer name"
+                        value={customerInfo.name}
+                        onChange={(e) => setCustomerInfo({ ...customerInfo, name: e.target.value })}
+                        required
+                      />
+                    </div>
+                    <div className="space-y-2">
+                      <Label htmlFor="customer-phone">Phone *</Label>
+                      <Input
+                        id="customer-phone"
+                        placeholder="Enter phone number"
+                        value={customerInfo.phone}
+                        onChange={(e) => setCustomerInfo({ ...customerInfo, phone: e.target.value })}
+                        required
+                      />
+                    </div>
+                    <div className="space-y-2">
+                      <Label htmlFor="customer-email">Email</Label>
+                      <Input
+                        id="customer-email"
+                        type="email"
+                        placeholder="Enter email address"
+                        value={customerInfo.email}
+                        onChange={(e) => setCustomerInfo({ ...customerInfo, email: e.target.value })}
+                      />
+                    </div>
+                    <div className="space-y-2">
+                      <Label htmlFor="customer-address">Address</Label>
+                      <Input
+                        id="customer-address"
+                        placeholder="Enter delivery address"
+                        value={customerInfo.address}
+                        onChange={(e) => setCustomerInfo({ ...customerInfo, address: e.target.value })}
+                      />
+                    </div>
+                  </div>
+                </div>
+
                 <div className="space-y-2">
                   <Label>Dining Option</Label>
                   <RadioGroup 
@@ -398,8 +454,8 @@ export default function Checkout({ order, onComplete, onBack } : any) {
                         <Label htmlFor="customer-name">Name</Label>
                         <Input
                           id="customer-name"
-                          value={customerDetails.name}
-                          onChange={(e) => setCustomerDetails({ ...customerDetails, name: e.target.value })}
+                          value={customerInfo.name}
+                          onChange={(e) => setCustomerInfo({ ...customerInfo, name: e.target.value })}
                           placeholder="Full name"
                           required
                           disabled={isProcessing}
@@ -409,8 +465,8 @@ export default function Checkout({ order, onComplete, onBack } : any) {
                         <Label htmlFor="customer-phone">Phone</Label>
                         <Input
                           id="customer-phone"
-                          value={customerDetails.phone}
-                          onChange={(e) => setCustomerDetails({ ...customerDetails, phone: e.target.value })}
+                          value={customerInfo.phone}
+                          onChange={(e) => setCustomerInfo({ ...customerInfo, phone: e.target.value })}
                           placeholder="Phone number"
                           required
                           disabled={isProcessing}
@@ -421,8 +477,8 @@ export default function Checkout({ order, onComplete, onBack } : any) {
                       <Label htmlFor="customer-email">Email</Label>
                       <Input
                         id="customer-email"
-                        value={customerDetails.email}
-                        onChange={(e) => setCustomerDetails({ ...customerDetails, email: e.target.value })}
+                        value={customerInfo.email}
+                        onChange={(e) => setCustomerInfo({ ...customerInfo, email: e.target.value })}
                         placeholder="Email address"
                         type="email"
                         disabled={isProcessing}
@@ -432,8 +488,8 @@ export default function Checkout({ order, onComplete, onBack } : any) {
                       <Label htmlFor="customer-address">Delivery Address</Label>
                       <Input
                         id="customer-address"
-                        value={customerDetails.address}
-                        onChange={(e) => setCustomerDetails({ ...customerDetails, address: e.target.value })}
+                        value={customerInfo.address}
+                        onChange={(e) => setCustomerInfo({ ...customerInfo, address: e.target.value })}
                         placeholder="Full address"
                         required
                         disabled={isProcessing}

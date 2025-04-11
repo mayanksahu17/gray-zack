@@ -2,7 +2,7 @@
 
 import { useState, useEffect } from "react"
 import { useRouter } from "next/navigation"
-import { Home, Clock, ShoppingBag, History, Package2, BarChart3, Settings, LogOut, User } from "lucide-react"
+import { Home, Clock, ShoppingBag, History, Package2, BarChart3, Settings, LogOut, User, Table2 } from "lucide-react"
 import { Button } from "@/components/ui/button"
 import { Separator } from "@/components/ui/separator"
 import Dashboard from "@/components/dashboard"
@@ -93,6 +93,16 @@ export default function RestaurantPOS() {
           </Button>
 
           <Button
+            variant={currentScreen === "tables" ? "secondary" : "ghost"}
+            size="icon"
+            className={`w-12 h-12 rounded-full ${currentScreen === "tables" ? "bg-blue-100 text-blue-700" : "text-white hover:bg-blue-700/50"}`}
+            onClick={() => navigateTo("tables")}
+          >
+            <Table2 size={24} />
+            <span className="sr-only">Tables</span>
+          </Button>
+
+          <Button
             variant={currentScreen === "order-history" ? "secondary" : "ghost"}
             size="icon"
             className={`w-12 h-12 rounded-full ${currentScreen === "order-history" ? "bg-blue-100 text-blue-700" : "text-white hover:bg-blue-700/50"}`}
@@ -102,15 +112,7 @@ export default function RestaurantPOS() {
             <span className="sr-only">Order History</span>
           </Button>
 
-          <Button
-            variant={currentScreen === "inventory" ? "secondary" : "ghost"}
-            size="icon"
-            className={`w-12 h-12 rounded-full ${currentScreen === "inventory" ? "bg-blue-100 text-blue-700" : "text-white hover:bg-blue-700/50"}`}
-            onClick={() => navigateTo("inventory")}
-          >
-            <Package2 size={24} />
-            <span className="sr-only">Inventory</span>
-          </Button>
+       
 
           <Button
             variant={currentScreen === "reports" ? "secondary" : "ghost"}
@@ -130,16 +132,6 @@ export default function RestaurantPOS() {
           >
             <Settings size={24} />
             <span className="sr-only">Settings</span>
-          </Button>
-
-          <Button
-            variant={currentScreen === "tables" ? "secondary" : "ghost"}
-            size="icon"
-            className={`w-12 h-12 rounded-full ${currentScreen === "tables" ? "bg-blue-100 text-blue-700" : "text-white hover:bg-blue-700/50"}`}
-            onClick={() => navigateTo("tables")}
-          >
-            <Settings size={24} />
-            <span className="sr-only">Tables</span>
           </Button>
         </nav>
 
@@ -161,7 +153,7 @@ export default function RestaurantPOS() {
               {currentScreen === "dashboard" && "Dashboard"}
               {currentScreen === "new-order" && "New Order"}
               {currentScreen === "checkout" && "Checkout"}
-              {currentScreen === "success" && "Order Complete"}
+              {currentScreen === "success" && "Order Complete"} 
               {currentScreen === "order-history" && "Order History"}
               {currentScreen === "inventory" && "Inventory Management"}
               {currentScreen === "reports" && "Reports & Analytics"}

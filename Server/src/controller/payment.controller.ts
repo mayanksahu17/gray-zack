@@ -1,18 +1,28 @@
-// controllers/paymentController.js
-import uuidv4   from 'uuid'
+import { Request, Response } from 'express';
 
+export const makePayment = async (req: Request, res: Response) => {
+  const { cardNumber, expiry, cvv, amount, currency, userId } = req.body;
 
-// // paymentController.js
-// exports.authorizePayment = async (req, res) => {
-//   try {
-//     // Save or hold security deposit/payment
-//     // Return payment status
-//   } catch (err) {
-//     res.status(500).json({ error: err.message });
-//   }
-// };
+  // Simple validation
+  if (!cardNumber || !expiry || !cvv || !amount || !currency || !userId) {
+    return res.status(400).json({
+      success: false,
+      message: 'Missing required fields'
+    });
+  }
 
+  // Simulate payment delay
+  setTimeout(() => {
+    const transactionId = 'txn_' + Math.random().toString(36).substring(2, 10);
 
-module.exports = {
-
+    res.status(200).json({
+      success: true,
+      message: 'Payment processed successfully',
+      transactionId,
+      checkinStatus: 'completed',
+      userId,
+      amount,
+      currency
+    });
+  }, 1000);
 };

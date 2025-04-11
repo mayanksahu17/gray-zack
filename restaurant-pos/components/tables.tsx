@@ -17,7 +17,7 @@ import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
 import { Badge } from "@/components/ui/badge"
 import { Label } from "@/components/ui/label"
-import { Filter, MoreHorizontal, RefreshCw, Search, SlidersHorizontal } from "lucide-react"
+import { Filter, MoreHorizontal, Plus, RefreshCw, Search, SlidersHorizontal, Trash2 } from "lucide-react"
 import { toast } from "@/components/ui/use-toast"
 
 // Define table interface
@@ -39,6 +39,11 @@ export default function RestaurantTables() {
   const [locationFilter, setLocationFilter] = useState<string>("all")
   const [selectedTable, setSelectedTable] = useState<RestaurantTable | null>(null)
   const [isUpdateDialogOpen, setIsUpdateDialogOpen] = useState(false)
+  const [isAddDialogOpen, setIsAddDialogOpen] = useState(false)
+  const [newTable, setNewTable] = useState<Partial<RestaurantTable>>({
+    status: "available",
+    features: []
+  })
 
   const restaurantId = "67e8f522404a64803d0cea8d" // This would typically come from a route parameter
 
@@ -46,7 +51,7 @@ export default function RestaurantTables() {
   const fetchTables = async () => {
     setLoading(true)
     try {
-      const response = await fetch(`https://8tvnlx2t-8000.inc1.devtunnels.ms/api/v1/admin/hotel/restaurant/${restaurantId}/tables`)
+      const response = await fetch(`http://localhost:8000/api/v1/admin/hotel/restaurant/${restaurantId}/tables`)
       const data = await response.json()
 
       if (data.success) {
@@ -71,22 +76,94 @@ export default function RestaurantTables() {
     }
   }
 
+  // Add new table
+  const handleAddTable = async () => {
+    try {
+      const response = await fetch(`http://localhost:8000/api/v1/admin/hotel/restaurant/${restaurantId}/tables`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify(newTable),
+      })
+      const data = await response.json()
+      if (data.success) {
+        toast({
+          title: "Success",
+          description: "Table added successfully",
+        })
+        setIsAddDialogOpen(false)
+        setNewTable({ status: "available", features: [] })
+        fetchTables()
+      } else {
+        toast({
+          title: "Error",
+          description: "Failed to add table",
+          variant: "destructive",
+        })
+      }
+    } catch (error) {
+      toast({
+        title: "Error",
+        description: "Failed to add table",
+        variant: "destructive",
+      })
+    }
+  }
+
+  // Delete table
+  const handleDeleteTable = async (tableNumber: string) => {
+    try {
+      const response = await fetch(`http://localhost:8000/api/v1/admin/hotel/restaurant/${restaurantId}/tables/${tableNumber}`, {
+        method: 'DELETE',
+      })
+      const data = await response.json()
+      if (data.success) {
+        toast({
+          title: "Success",
+          description: "Table deleted successfully",
+        })
+        fetchTables()
+      } else {
+        toast({
+          title: "Error",
+          description: "Failed to delete table",
+          variant: "destructive",
+        })
+      }
+    } catch (error) {
+      toast({
+        title: "Error",
+        description: "Failed to delete table",
+        variant: "destructive",
+      })
+    }
+  }
+
   // Update table status
   const updateTableStatus = async (tableId: string, newStatus: string) => {
     try {
-      // In a real application, you would make an API call here
-      // For demonstration, we'll update the local state
-      const updatedTables = tables.map((table) =>
-        table._id === tableId ? { ...table, status: newStatus as any } : table,
-      )
-
-      setTables(updatedTables)
-      applyFilters(updatedTables)
-
-      toast({
-        title: "Status updated",
-        description: `Table status has been updated to ${newStatus}`,
+      const response = await fetch(`http://localhost:8000/api/v1/admin/hotel/restaurant/${restaurantId}/tables/${tableId}/status`, {
+        method: 'PATCH',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({ status: newStatus }),
       })
+      const data = await response.json()
+      if (data.success) {
+        toast({
+          title: "Status updated",
+          description: `Table status has been updated to ${newStatus}`,
+        })
+        fetchTables()
+      } else {
+        toast({
+          title: "Update failed",
+          description: "Could not update table status",
+          variant: "destructive",
+        })
+      }
     } catch (error) {
       toast({
         title: "Update failed",
@@ -97,7 +174,7 @@ export default function RestaurantTables() {
   }
 
   // Apply filters and search
-  const applyFilters = (tableData = tables) => {
+  const applyFilters = (tableData: RestaurantTable[] = tables) => {
     let filtered = [...tableData]
 
     // Apply status filter
@@ -129,8 +206,8 @@ export default function RestaurantTables() {
 
   // Apply filters when filter states change
   useEffect(() => {
-    applyFilters()
-  }, [statusFilter, locationFilter, searchQuery])
+    applyFilters(tables)
+  }, [statusFilter, locationFilter, searchQuery, tables])
 
   // Get status badge color
   const getStatusColor = (status: string) => {
@@ -157,10 +234,16 @@ export default function RestaurantTables() {
               <CardTitle className="text-blue-800">Restaurant Tables Management</CardTitle>
               <CardDescription>Manage and update the status of all tables in your restaurant</CardDescription>
             </div>
-            <Button variant="outline" className="border-blue-300 text-blue-700" onClick={fetchTables}>
-              <RefreshCw className="mr-2 h-4 w-4" />
-              Refresh
-            </Button>
+            <div className="flex gap-2">
+              <Button variant="outline" className="border-blue-300 text-blue-700" onClick={fetchTables}>
+                <RefreshCw className="mr-2 h-4 w-4" />
+                Refresh
+              </Button>
+              <Button className="bg-blue-600 hover:bg-blue-700" onClick={() => setIsAddDialogOpen(true)}>
+                <Plus className="mr-2 h-4 w-4" />
+                Add Table
+              </Button>
+            </div>
           </div>
         </CardHeader>
         <CardContent className="p-6">
@@ -205,6 +288,7 @@ export default function RestaurantTables() {
                     <SelectItem value="all">All Locations</SelectItem>
                     <SelectItem value="indoor">Indoor</SelectItem>
                     <SelectItem value="outdoor">Outdoor</SelectItem>
+                    <SelectItem value="bar">Bar</SelectItem>
                   </SelectContent>
                 </Select>
               </div>
@@ -271,6 +355,13 @@ export default function RestaurantTables() {
                               >
                                 Update Status
                               </DropdownMenuItem>
+                              <DropdownMenuItem
+                                onClick={() => handleDeleteTable(table.tableNumber)}
+                                className="text-red-600"
+                              >
+                                <Trash2 className="mr-2 h-4 w-4" />
+                                Delete Table
+                              </DropdownMenuItem>
                             </DropdownMenuContent>
                           </DropdownMenu>
                         </TableCell>
@@ -321,6 +412,77 @@ export default function RestaurantTables() {
             <Button variant="outline" onClick={() => setIsUpdateDialogOpen(false)}>
               Cancel
             </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      {/* Add Table Dialog */}
+      <Dialog open={isAddDialogOpen} onOpenChange={setIsAddDialogOpen}>
+        <DialogContent className="sm:max-w-md">
+          <DialogHeader>
+            <DialogTitle>Add New Table</DialogTitle>
+            <DialogDescription>Add a new table to your restaurant</DialogDescription>
+          </DialogHeader>
+          <div className="grid gap-4 py-4">
+            <div className="grid grid-cols-4 items-center gap-4">
+              <Label htmlFor="tableNumber" className="text-right">
+                Table Number
+              </Label>
+              <Input
+                id="tableNumber"
+                className="col-span-3"
+                value={newTable.tableNumber}
+                onChange={(e) => setNewTable({ ...newTable, tableNumber: e.target.value })}
+              />
+            </div>
+            <div className="grid grid-cols-4 items-center gap-4">
+              <Label htmlFor="capacity" className="text-right">
+                Capacity
+              </Label>
+              <Input
+                id="capacity"
+                type="number"
+                className="col-span-3"
+                value={newTable.capacity}
+                onChange={(e) => setNewTable({ ...newTable, capacity: parseInt(e.target.value) })}
+              />
+            </div>
+            <div className="grid grid-cols-4 items-center gap-4">
+              <Label htmlFor="location" className="text-right">
+                Location
+              </Label>
+              <Select
+                value={newTable.location}
+                onValueChange={(value) => setNewTable({ ...newTable, location: value })}
+              >
+                <SelectTrigger className="col-span-3">
+                  <SelectValue placeholder="Select location" />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="indoor">Indoor</SelectItem>
+                  <SelectItem value="outdoor">Outdoor</SelectItem>
+                  <SelectItem value="bar">Bar</SelectItem>
+                </SelectContent>
+              </Select>
+            </div>
+            <div className="grid grid-cols-4 items-center gap-4">
+              <Label htmlFor="features" className="text-right">
+                Features
+              </Label>
+              <Input
+                id="features"
+                className="col-span-3"
+                placeholder="Comma separated features"
+                value={newTable.features?.join(', ')}
+                onChange={(e) => setNewTable({ ...newTable, features: e.target.value.split(',').map(f => f.trim()) })}
+              />
+            </div>
+          </div>
+          <DialogFooter>
+            <Button variant="outline" onClick={() => setIsAddDialogOpen(false)}>
+              Cancel
+            </Button>
+            <Button onClick={handleAddTable}>Add Table</Button>
           </DialogFooter>
         </DialogContent>
       </Dialog>

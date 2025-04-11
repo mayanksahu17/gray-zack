@@ -22,7 +22,7 @@ import {
   SidebarProvider,
 } from "@/components/ui/sidebar"
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs"
-
+import img from '../public/is_logo1 (1).webp'
 export function DashboardView() {
   const [activeView, setActiveView] = useState("dashboard")
 
@@ -234,12 +234,12 @@ export function DashboardView() {
     <SidebarProvider  >
       <div className="flex min-h-screen"  >
         <Sidebar >
-          <SidebarHeader className="border-b p-4">
-            <div className="flex items-center gap-2">
-              <Home className="h-6 w-6 text-primary" />
-              <div className="text-lg font-bold">Hotel POS</div>
-            </div>
-          </SidebarHeader>
+        <SidebarHeader className="border-b p-4">
+  <div className="flex items-center gap-2">
+
+    <img src="https://res.cloudinary.com/dwyyrm9xw/image/upload/v1744358318/wqc4hcdz0esi42jsijro.png" alt="" className="" />
+  </div>
+</SidebarHeader>
           <SidebarContent>
             <SidebarMenu>
               <SidebarMenuItem>

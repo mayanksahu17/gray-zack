@@ -40,7 +40,7 @@ import { Label } from "@/components/ui/label"
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs"
 import axios from 'axios'
-
+// import { BASE_URL as API_BASE_URL } from "@/lib/constants"
 
 
 // Define enum for room types
@@ -77,7 +77,7 @@ export interface IRoomDocument  {
 }
 
 
-const API_BASE_URL = "https://8tvnlx2t-8000.inc1.devtunnels.ms/api/v1/room";
+const API_BASE_URL = "http://localhost:8000/api/v1/room";
 const DEFAULT_HOTEL_ID = "60d21b4667d0d8992e610c85";
 
 
@@ -333,7 +333,7 @@ export function RoomManagementView() {
     }
     
     try {
-      const response = await axios.delete(`${API_BASE_URL}/${id}`);
+      const response = await axios.delete(`${API_BASE_URL}/room/${id}`);
       
       toast({
         title: "Success",
