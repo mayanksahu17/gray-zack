@@ -77,7 +77,7 @@ export interface IRoomDocument  {
 }
 
 
-const API_BASE_URL = "https://8tvnlx2t-8000.inc1.devtunnels.ms/api/v1/room";
+const API_BASE_URL = "http://localhost:8000/api/v1/room";
 const DEFAULT_HOTEL_ID = "60d21b4667d0d8992e610c85";
 
 

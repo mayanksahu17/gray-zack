@@ -1,5 +1,3 @@
 {
-  "/scheck/page": "app/scheck/page.js",
-  "/sucessfull/page": "app/sucessfull/page.js",
   "/page": "app/page.js"
 }

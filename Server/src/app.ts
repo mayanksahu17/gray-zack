@@ -8,7 +8,8 @@ const whitelist = [
   'http://localhost:3000',
   'http://localhost:3001',
   'https://gray-zack-113j.vercel.app',
-  'https://gray-zack.vercel.app'
+  'https://gray-zack.vercel.app',
+  'https://8tvnlx2t-3000.inc1.devtunnels.ms'
 ];
 
 app.use(cors({
@@ -40,7 +41,7 @@ app.use((req, res, next) => {
 });
 
 app.use((req, res, next) => {
-    const startTime = Date.now();
+    const startTime = Date.now(); 
 
     res.on('finish', () => {
         const duration = Date.now() - startTime;
